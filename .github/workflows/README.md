@@ -99,5 +99,10 @@ disparó el workflow — así se preserva la estructura de carpetas tal cual est
       > Nota: la generación v5 no tiene ningún node type de 2 vCPUs soportado por Databricks
       > (el más chico es `Standard_D4s_v5`, 4 vCPUs — agota la cuota). Las únicas VMs de 2
       > vCPUs en la lista de node types soportados son de generación v6, por eso `D2ds_v6`.
+      > Como las VM v6 son muy nuevas, DBR 14.3 LTS no trae la imagen para bootearlas (el
+      > cluster quedaba en loop "Compute X does not exist / acquiring" sin llegar a RUNNING).
+      > Por eso el `spark_version` se subió a `16.4.x-scala2.12` (LTS), que sí soporta v6.
+      > El pipeline es PySpark DataFrame API + `spark.sql` DDL, sin nada específico de
+      > versión, así que el salto de runtime no afecta el código.
 - [ ] Completar los prerequisitos manuales de arriba (credencial de Git, GitHub
       Environments/secrets, `REPO_PATH`) y correr el workflow por primera vez
