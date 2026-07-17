@@ -89,11 +89,15 @@ disparó el workflow — así se preserva la estructura de carpetas tal cual est
       dieron stockout en East US 2. Causa raíz real: la suscripción tiene una cuota
       **regional total** de 4 vCPUs en East US 2 (no por familia de VM) — cada una de esas
       tres VMs pedía exactamente 4 vCPUs, sin margen, por eso Azure se quedaba colgado en
-      `CREATING` en vez de fallar rápido. Se cambió a `Standard_D2s_v5` (x86, 2 vCPUs, 8GB
-      RAM) en [deploy.yml](deploy.yml), con margen dentro de la cuota — de sobra para
-      `prepamb`/`extract`/`transform`/`load`/`grants` con datasets de este tamaño en Single
-      Node. Se quitaron `driver_node_type_flexibility`/`worker_node_type_flexibility`: no
-      aportan nada contra un límite de cuota total (el fallback también consumiría vCPUs de
-      la misma cuota) y solo complicaban el debug.
+      `CREATING` en vez de fallar rápido. Se cambió a `Standard_D2ds_v6` (x86, 2 vCPUs, 8GB
+      RAM, con disco local) en [deploy.yml](deploy.yml), con margen dentro de la cuota — de
+      sobra para `prepamb`/`extract`/`transform`/`load`/`grants` con datasets de este tamaño
+      en Single Node. Se quitaron `driver_node_type_flexibility`/`worker_node_type_flexibility`:
+      no aportan nada contra un límite de cuota total (el fallback también consumiría vCPUs
+      de la misma cuota) y solo complicaban el debug.
+
+      > Nota: la generación v5 no tiene ningún node type de 2 vCPUs soportado por Databricks
+      > (el más chico es `Standard_D4s_v5`, 4 vCPUs — agota la cuota). Las únicas VMs de 2
+      > vCPUs en la lista de node types soportados son de generación v6, por eso `D2ds_v6`.
 - [ ] Completar los prerequisitos manuales de arriba (credencial de Git, GitHub
       Environments/secrets, `REPO_PATH`) y correr el workflow por primera vez
