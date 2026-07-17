@@ -2,4 +2,4 @@
 
 DROP scripts para las tablas Golden (Load) en Unity Catalog.
 
-Pendiente: un `.py` o `.sql` por tabla Golden creada en [proceso/04_load/](../../proceso/04_load/).
+- [01_drop_covid_summary_by_country.sql](01_drop_covid_summary_by_country.sql) — `golden.covid_summary_by_country`

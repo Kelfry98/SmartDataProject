@@ -1,0 +1,311 @@
+name: Deploy SmartDataProject pipeline
+
+# dev -> ambiente dev (workspace adbk-dev, dev_catalog)
+# main -> ambiente prod (workspace adbk-prod, prod_catalog), vía PR merge desde dev
+on:
+  push:
+    branches:
+      - dev
+      - main
+
+# Evita corridas superpuestas sobre el mismo ambiente (una detrás de otra, no en paralelo).
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Resuelve el GitHub Environment (dev/prod) por rama, así secrets.DATABRICKS_HOST y
+    # secrets.DATABRICKS_TOKEN toman el valor configurado en ese Environment.
+    # Prerequisito manual (una sola vez): crear los Environments "dev" y "prod" en
+    # Settings > Environments, cada uno con sus secrets DATABRICKS_HOST / DATABRICKS_TOKEN
+    # apuntando a adbk-dev / adbk-prod respectivamente.
+    environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
+
+    steps:
+      - name: Install jq & curl
+        run: sudo apt-get update && sudo apt-get install -y jq curl
+
+      - name: Resolve environment variables
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+          else
+            echo "ENVIRONMENT=dev" >> $GITHUB_ENV
+          fi
+          # Recursos compartidos entre dev y prod (mismo storage account/contenedor,
+          # mismo Access Connector — ver PrepAmb/00_azure_prerequisites.md).
+          echo "STORAGE_ACCOUNT=stdbkprojectsraw" >> $GITHUB_ENV
+          echo "CONTAINER_NAME=raw" >> $GITHUB_ENV
+          echo "ACCESS_CONNECTOR_ID=/subscriptions/16103103-9218-4387-9b8a-22036c92db03/resourceGroups/rg-dbk-projects/providers/Microsoft.Databricks/accessConnectors/ac-dbk-projects" >> $GITHUB_ENV
+          # Ruta del Repo dentro del workspace de Databricks. Ajustar <git-folder-owner>
+          # al usuario/service principal bajo el que se registró la credencial de Git en
+          # cada workspace (Databricks > Settings > Linked accounts).
+          echo "REPO_PATH=/Repos/<git-folder-owner>/SmartDataProject" >> $GITHUB_ENV
+
+      # No usamos actions/checkout: el código no se copia vía el runner de GitHub, se
+      # sincroniza directo desde GitHub hacia el workspace de Databricks vía la Repos API
+      # (ver step siguiente). Así proceso/01_prepamb/prepamb.py encuentra PrepAmb/*.sql
+      # como carpeta hermana, igual que en un checkout normal — si en cambio copiáramos
+      # notebooks sueltos (como hacía el template original), esa resolución de ruta
+      # relativa se rompería.
+      - name: Sync Databricks Repo to latest commit
+        run: |
+          DEST_HOST=${{ secrets.DATABRICKS_HOST }}
+          DEST_TOKEN=${{ secrets.DATABRICKS_TOKEN }}
+
+          existing=$(curl -s -X GET \
+            -H "Authorization: Bearer $DEST_TOKEN" \
+            "$DEST_HOST/api/2.0/repos?path_prefix=$REPO_PATH")
+
+          repo_id=$(echo "$existing" | jq -r '.repos[0].id // empty')
+
+          if [ -n "$repo_id" ]; then
+            echo "Repo existente ($repo_id) — actualizando a la última corrida de $ENVIRONMENT"
+            curl -s -X PATCH \
+              -H "Authorization: Bearer $DEST_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"branch\": \"${{ github.ref_name }}\"}" \
+              "$DEST_HOST/api/2.0/repos/$repo_id"
+          else
+            echo "Repo no existe — creándolo"
+            curl -s -X POST \
+              -H "Authorization: Bearer $DEST_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"url\": \"https://github.com/Kelfry98/SmartDataProject.git\", \"provider\": \"gitHub\", \"path\": \"$REPO_PATH\", \"branch\": \"${{ github.ref_name }}\"}" \
+              "$DEST_HOST/api/2.0/repos"
+          fi
+
+      - name: Delete existing job (idempotencia)
+        run: |
+          DEST_HOST=${{ secrets.DATABRICKS_HOST }}
+          DEST_TOKEN=${{ secrets.DATABRICKS_TOKEN }}
+          JOB_NAME="smartdataproject_pipeline_${ENVIRONMENT}"
+
+          jobs_response=$(curl -s -X GET \
+            -H "Authorization: Bearer $DEST_TOKEN" \
+            "$DEST_HOST/api/2.1/jobs/list")
+
+          existing_job_id=$(echo "$jobs_response" | jq -r --arg name "$JOB_NAME" '.jobs[]? | select(.settings.name == $name) | .job_id')
+
+          if [ -n "$existing_job_id" ] && [ "$existing_job_id" != "null" ]; then
+            echo "Job encontrado ($existing_job_id) — eliminando para recrearlo"
+            curl -s -X POST \
+              -H "Authorization: Bearer $DEST_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"job_id\": $existing_job_id}" \
+              "$DEST_HOST/api/2.1/jobs/delete"
+          fi
+
+      # Cluster efímero (Job Compute), un solo cluster compartido por todas las tareas
+      # (job_cluster_key), Single Node — se levanta al arrancar el job y se apaga solo al
+      # terminar. Así nunca queda un cluster prendido de forma persistente, en ningún
+      # ambiente. Ajustar node_type_id si esa VM no tiene cupo en la suscripción.
+      #
+      # DAG actual: prepamb -> {extract_who_covid_daily, extract_covid_historical_series}
+      # -> transform_covid_unified -> load_covid_summary_by_country -> grants.
+      - name: Create pipeline job
+        run: |
+          DEST_HOST=${{ secrets.DATABRICKS_HOST }}
+          DEST_TOKEN=${{ secrets.DATABRICKS_TOKEN }}
+          JOB_NAME="smartdataproject_pipeline_${ENVIRONMENT}"
+
+          cat > job_config.json << EOF
+          {
+            "name": "$JOB_NAME",
+            "job_clusters": [
+              {
+                "job_cluster_key": "pipeline_cluster",
+                "new_cluster": {
+                  "spark_version": "14.3.x-scala2.12",
+                  "node_type_id": "Standard_DS3_v2",
+                  "num_workers": 0,
+                  "spark_conf": {
+                    "spark.databricks.cluster.profile": "singleNode",
+                    "spark.master": "local[*]"
+                  },
+                  "custom_tags": { "ResourceClass": "SingleNode" },
+                  "azure_attributes": { "availability": "ON_DEMAND_AZURE" }
+                }
+              }
+            ],
+            "tasks": [
+              {
+                "task_key": "prepamb",
+                "job_cluster_key": "pipeline_cluster",
+                "timeout_seconds": 1800,
+                "max_retries": 1,
+                "notebook_task": {
+                  "notebook_path": "$REPO_PATH/proceso/01_prepamb/prepamb",
+                  "source": "WORKSPACE",
+                  "base_parameters": {
+                    "environment": "$ENVIRONMENT",
+                    "access_connector_id": "$ACCESS_CONNECTOR_ID"
+                  }
+                }
+              },
+              {
+                "task_key": "extract_who_covid_daily",
+                "depends_on": [{ "task_key": "prepamb" }],
+                "job_cluster_key": "pipeline_cluster",
+                "timeout_seconds": 1800,
+                "max_retries": 1,
+                "notebook_task": {
+                  "notebook_path": "$REPO_PATH/proceso/02_extract/extract_who_covid_daily",
+                  "source": "WORKSPACE",
+                  "base_parameters": {
+                    "environment": "$ENVIRONMENT",
+                    "storage_account": "$STORAGE_ACCOUNT",
+                    "container_name": "$CONTAINER_NAME",
+                    "raw_path": "who-covid-daily/WHO-COVID-19-global-daily-data.csv"
+                  }
+                }
+              },
+              {
+                "task_key": "extract_covid_historical_series",
+                "depends_on": [{ "task_key": "prepamb" }],
+                "job_cluster_key": "pipeline_cluster",
+                "timeout_seconds": 1800,
+                "max_retries": 1,
+                "notebook_task": {
+                  "notebook_path": "$REPO_PATH/proceso/02_extract/extract_covid_historical_series",
+                  "source": "WORKSPACE",
+                  "base_parameters": {
+                    "environment": "$ENVIRONMENT",
+                    "storage_account": "$STORAGE_ACCOUNT",
+                    "container_name": "$CONTAINER_NAME",
+                    "raw_path": "covid-historical-series/covid_historical_time_series.csv"
+                  }
+                }
+              },
+              {
+                "task_key": "transform_covid_unified",
+                "depends_on": [
+                  { "task_key": "extract_who_covid_daily" },
+                  { "task_key": "extract_covid_historical_series" }
+                ],
+                "job_cluster_key": "pipeline_cluster",
+                "timeout_seconds": 1800,
+                "max_retries": 1,
+                "notebook_task": {
+                  "notebook_path": "$REPO_PATH/proceso/03_transform/transform_covid_unified",
+                  "source": "WORKSPACE",
+                  "base_parameters": { "environment": "$ENVIRONMENT" }
+                }
+              },
+              {
+                "task_key": "load_covid_summary_by_country",
+                "depends_on": [{ "task_key": "transform_covid_unified" }],
+                "job_cluster_key": "pipeline_cluster",
+                "timeout_seconds": 1800,
+                "max_retries": 1,
+                "notebook_task": {
+                  "notebook_path": "$REPO_PATH/proceso/04_load/load_covid_summary_by_country",
+                  "source": "WORKSPACE",
+                  "base_parameters": { "environment": "$ENVIRONMENT" }
+                }
+              },
+              {
+                "task_key": "grants",
+                "depends_on": [{ "task_key": "load_covid_summary_by_country" }],
+                "job_cluster_key": "pipeline_cluster",
+                "timeout_seconds": 1800,
+                "max_retries": 1,
+                "notebook_task": {
+                  "notebook_path": "$REPO_PATH/proceso/05_grants/grants",
+                  "source": "WORKSPACE",
+                  "base_parameters": { "environment": "$ENVIRONMENT" }
+                }
+              }
+            ],
+            "max_concurrent_runs": 1,
+            "tags": {
+              "environment": "$ENVIRONMENT",
+              "created_by": "github_actions",
+              "project": "SmartDataProject"
+            }
+          }
+          EOF
+
+          create_response=$(curl -s -X POST \
+            -H "Authorization: Bearer $DEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d @job_config.json \
+            "$DEST_HOST/api/2.1/jobs/create")
+
+          echo "$create_response"
+          job_id=$(echo "$create_response" | jq -r '.job_id // empty')
+
+          if [ -z "$job_id" ]; then
+            echo "Error creando el job"
+            exit 1
+          fi
+          echo "JOB_ID=$job_id" >> $GITHUB_ENV
+
+      - name: Run pipeline job
+        run: |
+          DEST_HOST=${{ secrets.DATABRICKS_HOST }}
+          DEST_TOKEN=${{ secrets.DATABRICKS_TOKEN }}
+
+          run_response=$(curl -s -X POST \
+            -H "Authorization: Bearer $DEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"job_id\": $JOB_ID}" \
+            "$DEST_HOST/api/2.1/jobs/run-now")
+
+          run_id=$(echo "$run_response" | jq -r '.run_id // empty')
+
+          if [ -z "$run_id" ]; then
+            echo "Error ejecutando el job: $run_response"
+            exit 1
+          fi
+
+          echo "RUN_ID=$run_id" >> $GITHUB_ENV
+          echo "URL del run: $DEST_HOST/jobs/$JOB_ID/runs/$run_id"
+
+      - name: Monitor pipeline run
+        run: |
+          DEST_HOST=${{ secrets.DATABRICKS_HOST }}
+          DEST_TOKEN=${{ secrets.DATABRICKS_TOKEN }}
+
+          max_wait_time=1800
+          wait_time=0
+          check_interval=30
+
+          while [ $wait_time -lt $max_wait_time ]; do
+            run_status=$(curl -s -X GET \
+              -H "Authorization: Bearer $DEST_TOKEN" \
+              "$DEST_HOST/api/2.1/jobs/runs/get?run_id=$RUN_ID")
+
+            state=$(echo "$run_status" | jq -r '.state.life_cycle_state')
+            result_state=$(echo "$run_status" | jq -r '.state.result_state // "RUNNING"')
+
+            echo "[$wait_time s] $state ($result_state)"
+            echo "$run_status" | jq -r '.tasks[]? | "  - " + .task_key + ": " + .state.life_cycle_state + " (" + (.state.result_state // "RUNNING") + ")"'
+
+            case "$state" in
+              TERMINATED)
+                if [ "$result_state" = "SUCCESS" ]; then
+                  echo "Pipeline completado exitosamente."
+                  exit 0
+                else
+                  echo "Pipeline terminó con errores: $result_state"
+                  exit 1
+                fi
+                ;;
+              INTERNAL_ERROR|SKIPPED)
+                echo "Pipeline falló con estado: $state"
+                exit 1
+                ;;
+            esac
+
+            sleep $check_interval
+            wait_time=$((wait_time + check_interval))
+          done
+
+          echo "Timeout esperando el resultado — sigue corriendo en Databricks: $DEST_HOST/jobs/$JOB_ID/runs/$RUN_ID"
+          exit 1

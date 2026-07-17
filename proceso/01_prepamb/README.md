@@ -16,9 +16,11 @@ el storage credential `raw_sc`). Extract/Transform/Load son 100% PySpark.
 | Widget | Descripción | Quién lo inyecta |
 |---|---|---|
 | `environment` | `dev` o `prod` → determina el catalog (`{environment}_catalog`) | Job de Databricks (desde GitHub Actions) |
-| `storage_account` | Nombre del Storage Account de Raw | GitHub Secret |
-| `container_name` | Contenedor de Raw (default `raw`) | GitHub Secret / default |
 | `access_connector_id` | Resource ID del Access Connector for Databricks | GitHub Secret |
+
+`storage_account`/`container_name` ya no son parámetros de este notebook: el external
+location (`04_external_location.sql`) quedó con la URL fija (`stdbkprojectsraw`/`raw`), ya
+creada y validada — no se parametriza.
 
 ## Notas de implementación pendientes de verificar
 

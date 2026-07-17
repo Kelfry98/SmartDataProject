@@ -1,9 +1,8 @@
 # 00 — Prerequisitos de Azure (fuera de Databricks)
 
-> **Estado: ya validado manualmente.** Todos los recursos de esta sección existen y están
-> confirmados en Azure/Databricks. Lo que queda pendiente es correr
-> [proceso/01_prepamb/prepamb.py](../proceso/01_prepamb/prepamb.py) para que cree/confirme
-> el external location (`raw_ext_loc`) por código — ver [PrepAmb/README.md](README.md).
+> **Estado: ya validado manualmente.** Todos los recursos de esta sección, incluyendo
+> `raw_ext_loc` y su `GRANT READ FILES`, existen y están confirmados en Azure/Databricks —
+> ver [PrepAmb/README.md](README.md).
 
 ## Recursos confirmados
 
@@ -15,7 +14,7 @@
 | Access Connector for Databricks | `ac-dbk-projects` |
 | Databricks Workspaces | `adbk-dev` y `adbk-prod` — comparten el mismo metastore de Unity Catalog: `metastore_azure_eastus2` |
 | Storage Credential (Unity Catalog) | `raw_sc` — Managed Identity, apunta a `ac-dbk-projects` |
-| External Location (Unity Catalog) | `raw_ext_loc` — sobre `abfss://raw@stdbkprojectsraw.dfs.core.windows.net/` (pendiente de crear/confirmar vía [04_external_location.sql](04_external_location.sql)) |
+| External Location (Unity Catalog) | `raw_ext_loc` — sobre `abfss://raw@stdbkprojectsraw.dfs.core.windows.net/`, creada y validada. `GRANT READ FILES` aplicado a `account users` |
 
 ```bash
 RESOURCE_GROUP="rg-dbk-projects"
@@ -62,7 +61,9 @@ az storage container create \
   --auth-mode login
 ```
 
-Sube ahí los CSV de [datasets/](../datasets/) (o automatiza la carga en un paso previo del CI/CD).
+Ahí ya están subidos los 2 CSV, uno por carpeta (ver [datasets/](../datasets/)):
+- `who-covid-daily/WHO-COVID-19-global-daily-data.csv`
+- `covid-historical-series/covid_historical_time_series.csv`
 
 ## 4. Access Connector for Databricks (Managed Identity)
 
@@ -112,11 +113,12 @@ az role assignment create \
 | Valor | Dónde se usa |
 |---|---|
 | `ACCESS_CONNECTOR_ID` (ver nota arriba) | [03_storage_credential.py](03_storage_credential.py) |
-| `STORAGE_ACCOUNT` = `stdbkprojectsraw` | [04_external_location.sql](04_external_location.sql) |
-| `CONTAINER_NAME` = `raw` | [04_external_location.sql](04_external_location.sql) |
 
-Estos tres valores se guardan como **GitHub Secrets** (por ambiente: dev/prod) y se pasan
-como parámetros al job de Databricks que corre [proceso/01_prepamb/prepamb.py](../proceso/01_prepamb/prepamb.py).
+`STORAGE_ACCOUNT`/`CONTAINER_NAME` ya no se pasan como parámetro: quedaron fijos dentro de
+[04_external_location.sql](04_external_location.sql) (`stdbkprojectsraw`/`raw`), ya creada.
 
-Pendiente: cargar estos valores como GitHub Secrets (uno por ambiente, apuntando al
+`ACCESS_CONNECTOR_ID` se guarda como **GitHub Secret** (por ambiente: dev/prod) y se pasa
+como parámetro al job de Databricks que corre [proceso/01_prepamb/prepamb.py](../proceso/01_prepamb/prepamb.py).
+
+Pendiente: cargar `access_connector_id` como GitHub Secret (uno por ambiente, apuntando al
 workspace `adbk-dev` o `adbk-prod` correspondiente).

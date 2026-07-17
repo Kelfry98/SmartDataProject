@@ -12,8 +12,6 @@ import os
 import importlib.util
 
 dbutils.widgets.text("environment", "dev", "Ambiente (dev|prod)")
-dbutils.widgets.text("storage_account", "stdbkprojectsraw", "Storage Account de Raw")
-dbutils.widgets.text("container_name", "raw", "Contenedor de Raw")
 dbutils.widgets.text(
     "access_connector_id",
     "/subscriptions/16103103-9218-4387-9b8a-22036c92db03/resourceGroups/rg-dbk-projects/providers/Microsoft.Databricks/accessConnectors/ac-dbk-projects",
@@ -21,11 +19,9 @@ dbutils.widgets.text(
 )
 
 environment = dbutils.widgets.get("environment")
-storage_account = dbutils.widgets.get("storage_account")
-container_name = dbutils.widgets.get("container_name")
 access_connector_id = dbutils.widgets.get("access_connector_id")
 
-catalog_name = f"{environment}_catalog"
+catalog = f"{environment}_catalog"
 
 # En Databricks Repos este notebook vive en proceso/01_prepamb/, PrepAmb/ es
 # hermano de proceso/ en la raíz del repo.
@@ -36,11 +32,14 @@ PREPAMB_DIR = os.path.normpath(os.path.join(NOTEBOOK_DIR, "..", "..", "PrepAmb")
 def run_sql_file(filename: str, **params: str) -> None:
     path = os.path.join(PREPAMB_DIR, filename)
     with open(path, "r", encoding="utf-8") as f:
-        sql = f.read()
-    sql = sql.format(**params)
+        # Se filtran las líneas de comentario ANTES de unir y separar por ";" — si no,
+        # un bloque de comentarios pegado (sin ";" de por medio) al primer statement real
+        # hace que todo el bloque se lea como "empieza con --" y ese statement se salte.
+        lines = [line for line in f if not line.strip().startswith("--")]
+    sql = "".join(lines).format(**params)
     for statement in sql.split(";"):
         statement = statement.strip()
-        if statement and not statement.startswith("--"):
+        if statement:
             spark.sql(statement)
 
 
@@ -56,12 +55,12 @@ def load_module(filename: str):
 # COMMAND ----------
 
 # 01 — Catalog del ambiente actual
-run_sql_file("01_catalog.sql", catalog=catalog_name)
+run_sql_file("01_catalog.sql", catalog=catalog)
 
 # COMMAND ----------
 
 # 02 — Schemas bronze/silver/golden del ambiente actual
-run_sql_file("02_schemas.sql", catalog=catalog_name)
+run_sql_file("02_schemas.sql", catalog=catalog)
 
 # COMMAND ----------
 
@@ -77,13 +76,10 @@ storage_credential.create_storage_credential(
 # COMMAND ----------
 
 # 04 — External Location apuntando al contenedor Raw — compartido entre ambientes.
-# Depende de que raw_sc (paso 03) ya exista.
-run_sql_file(
-    "04_external_location.sql",
-    storage_account=storage_account,
-    container_name=container_name,
-)
+# Depende de que raw_sc (paso 03) ya exista. Valores fijos dentro del .sql (ya creada y
+# validada en Azure/Databricks), no toma storage_account/container_name como parámetro.
+run_sql_file("04_external_location.sql")
 
 # COMMAND ----------
 
-dbutils.notebook.exit(catalog_name)
+dbutils.notebook.exit(catalog)

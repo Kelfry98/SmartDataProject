@@ -11,7 +11,7 @@ el notebook [proceso/01_prepamb/prepamb.py](../proceso/01_prepamb/prepamb.py) lo
 | 01 | [01_catalog.sql](01_catalog.sql) | SQL | `CREATE CATALOG {catalog}` | Por ambiente (dev_catalog / prod_catalog) |
 | 02 | [02_schemas.sql](02_schemas.sql) | SQL | Schemas `bronze`, `silver`, `golden` | Por ambiente |
 | 03 | [03_storage_credential.py](03_storage_credential.py) | **Python (Databricks SDK)** | Storage Credential `raw_sc` respaldado por la Managed Identity | Compartido (una vez) |
-| 04 | [04_external_location.sql](04_external_location.sql) | SQL | External Location `raw_ext_loc` apuntando al contenedor Raw | Compartido (una vez), depende de 03 |
+| 04 | [04_external_location.sql](04_external_location.sql) | SQL | External Location `raw_ext_loc` + `GRANT READ FILES` a `account users` | Compartido (una vez), depende de 03 |
 
 > **Por qué 03 es `.py` y no `.sql`**: `CREATE STORAGE CREDENTIAL ... WITH
 > AZURE_MANAGED_IDENTITY` no es un comando SQL válido en Databricks — un Storage
@@ -59,5 +59,6 @@ Ver [reversion/prepamb/](../reversion/prepamb/) para los DROP correspondientes.
 
 - [x] Recursos de Azure confirmados (resource group, storage account, contenedor, access
       connector, storage credential) — ver tabla arriba
-- [ ] Crear/confirmar `raw_ext_loc` corriendo [proceso/01_prepamb/prepamb.py](../proceso/01_prepamb/prepamb.py)
-- [ ] Cargar `access_connector_id`, `storage_account` como GitHub Secrets (uno por ambiente)
+- [x] `raw_ext_loc` creada y validada manualmente, `GRANT READ FILES` aplicado a
+      `account users`
+- [ ] Cargar `access_connector_id` como GitHub Secret (por ambiente)
