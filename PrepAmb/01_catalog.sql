@@ -3,4 +3,4 @@
 -- parámetro `environment` (dev|prod) recibido del job de CI/CD.
 
 CREATE CATALOG IF NOT EXISTS {catalog}
-COMMENT 'Catalog del ambiente {catalog} — SmartDataProject (medallion ETL)';
+  MANAGED LOCATION 'abfss://raw@stdbkprojectsraw.dfs.core.windows.net/catalog-{catalog}/';
