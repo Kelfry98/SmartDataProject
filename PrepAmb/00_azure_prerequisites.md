@@ -1,4 +1,4 @@
-# 00 — Prerequisitos de Azure (fuera de Databricks)
+# 00 — Prerequisitos de Azure
 
 > **Estado: ya validado manualmente.** Todos los recursos de esta sección, incluyendo
 > `raw_ext_loc` y su `GRANT READ FILES`, existen y están confirmados en Azure/Databricks —
