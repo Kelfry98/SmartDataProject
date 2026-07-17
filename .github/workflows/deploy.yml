@@ -45,7 +45,7 @@ jobs:
           # Ruta del Repo dentro del workspace de Databricks. Ajustar <git-folder-owner>
           # al usuario/service principal bajo el que se registró la credencial de Git en
           # cada workspace (Databricks > Settings > Linked accounts).
-          echo "REPO_PATH=/Repos/<git-folder-owner>/SmartDataProject" >> $GITHUB_ENV
+          echo "REPO_PATH=/Repos/jlptrader30@hotmail.com/SmartDataProject" >> $GITHUB_ENV
 
       # No usamos actions/checkout: el código no se copia vía el runner de GitHub, se
       # sincroniza directo desde GitHub hacia el workspace de Databricks vía la Repos API
