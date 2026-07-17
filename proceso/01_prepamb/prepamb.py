@@ -1,4 +1,5 @@
 # Databricks notebook source
+# DBTITLE 1,Cell 1
 # Prepara el ambiente (dev|prod) en Unity Catalog, corriendo PrepAmb/ en orden:
 # 01_catalog.sql -> 02_schemas.sql -> 03_storage_credential.py -> 04_external_location.sql
 #
@@ -25,7 +26,9 @@ catalog = f"{environment}_catalog"
 
 # En Databricks Repos este notebook vive en proceso/01_prepamb/, PrepAmb/ es
 # hermano de proceso/ en la raíz del repo.
-NOTEBOOK_DIR = os.path.dirname(os.path.abspath(__file__))
+NOTEBOOK_DIR = "/Workspace" + os.path.dirname(
+    dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+)
 PREPAMB_DIR = os.path.normpath(os.path.join(NOTEBOOK_DIR, "..", "..", "PrepAmb"))
 
 
