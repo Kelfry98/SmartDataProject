@@ -114,6 +114,15 @@ jobs:
           DEST_TOKEN=${{ secrets.DATABRICKS_TOKEN }}
           JOB_NAME="smartdataproject_pipeline_${ENVIRONMENT}"
 
+          # El cluster corre en modo SINGLE_USER (Dedicated) para tener Unity Catalog
+          # habilitado; ese modo exige el principal dueño del cluster. Se resuelve
+          # dinámicamente al dueño del token (= run-as del job), así sirve igual en dev/prod
+          # sin hardcodear el usuario.
+          SINGLE_USER_NAME=$(curl -s -X GET \
+            -H "Authorization: Bearer $DEST_TOKEN" \
+            "$DEST_HOST/api/2.0/preview/scim/v2/Me" | jq -r '.userName')
+          echo "Cluster single_user_name = $SINGLE_USER_NAME"
+
           cat > job_config.json << EOF
           {
             "name": "$JOB_NAME",
@@ -123,6 +132,8 @@ jobs:
                 "new_cluster": {
                   "spark_version": "17.3.x-scala2.13",
                   "node_type_id": "Standard_D4plds_v6",
+                  "data_security_mode": "SINGLE_USER",
+                  "single_user_name": "$SINGLE_USER_NAME",
                   "num_workers": 0,
                   "spark_conf": {
                     "spark.databricks.cluster.profile": "singleNode",
