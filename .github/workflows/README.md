@@ -21,21 +21,89 @@ Ambos workspaces (`adbk-dev`, `adbk-prod`) cuelgan del mismo metastore de Unity 
 location (`raw_ext_loc`) — lo único que cambia entre ambientes es el catalog y el
 workspace host/token usado por el job de Databricks.
 
-Un solo workflow (usando la plantilla YML3) parametrizado por el ambiente resuelto a partir
-de la rama (`github.ref`), en vez de dos workflows separados — evita duplicar los jobs.
+Un solo workflow ([deploy.yml](deploy.yml), basado en la plantilla YML3) parametrizado por
+el ambiente resuelto a partir de la rama (`github.ref`), en vez de dos workflows
+separados — evita duplicar los jobs. El `environment:` del job de GitHub Actions también
+se resuelve por rama (`dev`/`prod`), así `secrets.DATABRICKS_HOST`/`DATABRICKS_TOKEN` toman
+el valor correcto según el GitHub Environment configurado.
 
-## Jobs del pipeline
+## Alcance del deploy — SOLO proceso/
 
-1. **Prep ambiente** — ejecuta scripts de [PrepAmb/](../../PrepAmb/) (catalog, schemas, external location)
-2. **Extract** — corre notebooks de [proceso/02_extract/](../../proceso/02_extract/) (Bronze)
-3. **Transform** — corre notebooks de [proceso/03_transform/](../../proceso/03_transform/) (Silver)
-4. **Load** — corre notebooks de [proceso/04_load/](../../proceso/04_load/) (Golden)
-5. **Grants** — aplica permisos de [seguridad/](../../seguridad/) vía [proceso/05_grants/](../../proceso/05_grants/)
+El workflow ejecuta **únicamente** los notebooks `.py` dentro de [proceso/](../../proceso/),
+en este DAG (ver detalle de cada etapa en su propio README):
 
-Restricción de infraestructura: un único cluster Databricks encendido, y debe ser el de
-producción (los jobs de dev también deben apuntar a ese cluster o usar Jobs Compute
-efímero, para no mantener más de un cluster activo).
+1. [proceso/01_prepamb/prepamb.py](../../proceso/01_prepamb/prepamb.py) — lee y aplica
+   [PrepAmb/](../../PrepAmb/) (catalog, schemas, storage credential, external location)
+2. [proceso/02_extract/](../../proceso/02_extract/) — 2 notebooks en paralelo (uno por
+   dataset) → Bronze
+3. [proceso/03_transform/](../../proceso/03_transform/) — 1 notebook, une ambas fuentes
+   Bronze en una sola tabla Silver (`silver.covid_unified`)
+4. [proceso/04_load/](../../proceso/04_load/) — 1 notebook, consolida Silver en
+   `golden.covid_summary_by_country` (métricas finales + per-cápita)
+5. [proceso/05_grants/](../../proceso/05_grants/) — lee y aplica [seguridad/](../../seguridad/)
 
-Pendiente: `deploy.yml` con los jobs anteriores encadenados, trigger `push` en `dev` y
-`main`, ambiente resuelto por rama, y `dev`/`prod` configurados como GitHub Environments
-(con sus secrets: Databricks host, token/SPN, etc.).
+`PrepAmb/` y `seguridad/` no se ejecutan directamente ni son "deployados" por sí solos —
+son la fuente de verdad (SQL/Python) que los notebooks 01 y 05 leen y aplican en tiempo de
+ejecución. Fuera de `proceso/`, ninguna otra carpeta del repo es tocada por el pipeline:
+[datasets/](../../datasets/), [dashboard/](../../dashboard/), [certificaciones/](../../certificaciones/)
+y [evidencias/](../../evidencias/) son solo documentación/artefactos del repo — existen en
+`main` porque `main` refleja el repo completo, pero el workflow nunca los lee ni los corre.
+
+## Cómo cumple "un solo cluster encendido"
+
+`adbk-dev` y `adbk-prod` son workspaces separados — un cluster no se puede compartir entre
+ambos, así que "apuntar siempre al cluster de prod" no es viable. En su lugar,
+[deploy.yml](deploy.yml) usa **Job Compute efímero** (`new_cluster`, no
+`existing_cluster_id`): un único cluster **compartido por todas las tareas** del pipeline
+vía `job_cluster_key`, Single Node (`num_workers: 0`), que Databricks levanta al arrancar
+el job y apaga solo al terminar. Nunca queda un cluster prendido de forma persistente en
+ningún ambiente — en cualquier momento hay como máximo uno encendido, el que está corriendo
+esa corrida.
+
+## Cómo se despliega el código — Databricks Repos API
+
+`deploy.yml` **no** copia notebooks sueltos a una carpeta plana del workspace (eso rompería
+`proceso/01_prepamb/prepamb.py`, que depende de que `PrepAmb/*.sql` exista como carpeta
+hermana vía rutas relativas). En vez de eso, sincroniza el **repo completo** al workspace
+usando la [Databricks Repos API](https://docs.databricks.com/api/workspace/repos):
+crea (o actualiza) un Repo en `$REPO_PATH` apuntando a este repo de GitHub, en la rama que
+disparó el workflow — así se preserva la estructura de carpetas tal cual está en git.
+
+## Prerequisitos manuales (una sola vez, por workspace)
+
+- **Credencial de Git en Databricks**: registrar un GitHub PAT en
+  `adbk-dev` y `adbk-prod` (User Settings → Linked accounts → Git integration), para que la
+  Repos API pueda clonar este repo (privado).
+- **GitHub Environments**: crear `dev` y `prod` en Settings → Environments del repo, cada
+  uno con secrets `DATABRICKS_HOST` y `DATABRICKS_TOKEN` apuntando a `adbk-dev` /
+  `adbk-prod` respectivamente (token = Databricks PAT o Azure AD app con permisos sobre
+  Jobs API y Repos API).
+- Ajustar `REPO_PATH` en `deploy.yml` (`/Repos/<git-folder-owner>/SmartDataProject`) al
+  usuario/service principal bajo el que quedó registrada la credencial de Git.
+
+## Pendiente
+
+- [x] `proceso/` completo end-to-end (`prepamb → extract x2 → transform → load → grants`) —
+      `deploy.yml` referencia los 6 notebooks reales, DAG validado
+- [x] VM del cluster efímero — historia de diagnóstico (via Databricks CLI, `clusters
+      events`): `Standard_DS3_v2`, `Standard_D4s_v5`, `Standard_E4ds_v5` y `Standard_D2ds_v6`
+      fallaron todos con `CLOUD_PROVIDER_RESOURCE_STOCKOUT` / `SkuNotAvailable` /
+      "Capacity Restrictions" en East US 2 — **no era cuota, era falta de capacidad física
+      de esas SKU x86 en la región** (un error de cuota sería `QuotaExceeded`). Se probó en
+      vivo (crear cluster + `clusters events`) que `Standard_D2ads_v6` (AMD, x86) sí tenía
+      capacidad y llegó a RUNNING. Config final: **`Standard_D4plds_v6`** (ARM/Ampere, 4
+      vCPUs, 8GB) con **DBR `17.3.x-scala2.13`** (LTS, Apache Spark 4.0). Es la config que el
+      dueño ya había corrido con éxito durante un curso en esta misma suscripción.
+
+      > Por qué ARM (`D4plds_v6`): las VM ARM de Azure usan un **pool de capacidad y una
+      > cuota separados** del x86, así que esquivan por completo el stockout x86 que nos tuvo
+      > dando vueltas. El pipeline es 100% PySpark DataFrame API + `spark.sql` DDL +
+      > `databricks-sdk` — sin dependencias nativas x86, corre igual en ARM. `D4plds_v6` es
+      > ARM, por eso requiere un runtime ARM; DBR 17.3 LTS lo es.
+      >
+      > Nota Spark 4.0: DBR 17.3 trae Apache Spark 4.0 con **ANSI mode activado por
+      > defecto** (casts/divisiones inválidas lanzan error en vez de devolver `null`). El
+      > Load ya protege las divisiones con `F.when(... != 0)`, pero es algo a vigilar si
+      > aparece algún error de casteo en Extract/Transform.
+- [ ] Completar los prerequisitos manuales de arriba (credencial de Git, GitHub
+      Environments/secrets, `REPO_PATH`) y correr el workflow por primera vez

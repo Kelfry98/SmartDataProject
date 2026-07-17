@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push *)",
+      "Bash(ls \"C:\\\\Users\\\\kelfr\\\\.claude\\\\projects\\\\c--Users-kelfr-OneDrive-Documentos-GitHub-SmartDataProject\\\\memory\\\\\" 2>&1 || echo \"no existe aun / se creara\")",
+      "Read(//c/Users/kelfr/.claude/projects/c--Users-kelfr-OneDrive-Documentos-GitHub-SmartDataProject/**)",
+      "Bash(node -e \"const fs=require\\('fs'\\); const yaml=require\\('js-yaml'\\);\")",
+      "Bash(/c/Python314/python.exe -c \"import yaml\")",
+      "Bash(/c/Python314/python.exe -m pip install --quiet pyyaml)",
+      "Bash(/c/Python314/python.exe -c ' *)"
+    ]
+  }
+}

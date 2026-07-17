@@ -16,16 +16,25 @@ el storage credential `raw_sc`). Extract/Transform/Load son 100% PySpark.
 | Widget | Descripción | Quién lo inyecta |
 |---|---|---|
 | `environment` | `dev` o `prod` → determina el catalog (`{environment}_catalog`) | Job de Databricks (desde GitHub Actions) |
-| `storage_account` | Nombre del Storage Account de Raw | GitHub Secret |
-| `container_name` | Contenedor de Raw (default `raw`) | GitHub Secret / default |
 | `access_connector_id` | Resource ID del Access Connector for Databricks | GitHub Secret |
 
-## Notas de implementación pendientes de verificar
+`storage_account`/`container_name` ya no son parámetros de este notebook: el external
+location (`04_external_location.sql`) quedó con la URL fija (`stdbkprojectsraw`/`raw`), ya
+creada y validada — no se parametriza.
 
-- El notebook resuelve la ruta a [PrepAmb/](../../PrepAmb/) vía `__file__`, asumiendo que
-  corre como parte de un Databricks Repo (Files in Repos). Si el cluster/runtime usado no
-  soporta `__file__` en notebooks, hay que ajustar la resolución de ruta (por ejemplo,
-  pasando la ruta absoluta del repo como parámetro adicional del job).
+## Notas de implementación
+
+- **Resolución de ruta a `PrepAmb/`**: probado manualmente en `adbk-dev` corriendo el
+  notebook con "Run all" interactivo — `__file__` no está definido en ese modo (solo es
+  confiable dentro de un Job). Se corrigió usando el contexto del notebook en su lugar:
+  ```python
+  NOTEBOOK_DIR = "/Workspace" + os.path.dirname(
+      dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+  )
+  ```
+  Esto funciona tanto en ejecución interactiva como en Jobs. El mismo patrón (y el mismo
+  fix) aplica en [proceso/05_grants/grants.py](../05_grants/grants.py), que resuelve la
+  ruta a [seguridad/](../../seguridad/) de la misma forma.
 - `03_storage_credential.py` importa `databricks.sdk`. En Databricks Runtime 14.3 LTS+ ya
   viene preinstalado; en runtimes más viejos hay que agregar `%pip install databricks-sdk`
   antes de correr este paso.

@@ -3,11 +3,12 @@
 -- 03_storage_credential.py (Managed Identity — sin DBFS, sin Volumes). Debe correr
 -- DESPUÉS de 03_storage_credential.py: depende de que raw_sc ya exista.
 --
--- Se crea una sola vez a nivel de metastore (no es específico de dev/prod).
--- Placeholders {storage_account} y {container_name} sustituidos por
--- proceso/01_prepamb/prepamb.py.
+-- Se crea una sola vez a nivel de metastore (no es específico de dev/prod). Ya creada y
+-- validada manualmente en Azure/Databricks — valores fijos, sin placeholders.
 
 CREATE EXTERNAL LOCATION IF NOT EXISTS raw_ext_loc
-URL 'abfss://{container_name}@{storage_account}.dfs.core.windows.net/'
-WITH (STORAGE_CREDENTIAL raw_sc)
-COMMENT 'Contenedor Raw — fuente de los datasets para la capa Bronze';
+  URL 'abfss://raw@stdbkprojectsraw.dfs.core.windows.net/'
+  WITH (CREDENTIAL raw_sc)
+  COMMENT 'Raw layer - COVID-19 datasets (WHO + historical worldwide)';
+
+GRANT READ FILES ON EXTERNAL LOCATION raw_ext_loc TO `account users`;
