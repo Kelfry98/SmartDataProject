@@ -85,14 +85,15 @@ disparó el workflow — así se preserva la estructura de carpetas tal cual est
 
 - [x] `proceso/` completo end-to-end (`prepamb → extract x2 → transform → load → grants`) —
       `deploy.yml` referencia los 6 notebooks reales, DAG validado
-- [x] VM del cluster efímero: `Standard_DS3_v2` y luego `Standard_D4s_v5` tuvieron stockout
-      en East US 2 — ninguna de las dos tiene VMs compatibles registradas para fallback
-      automático (Azure Databricks [flexible node type compatibility reference](https://learn.microsoft.com/en-us/azure/databricks/compute/flexible-node-type-instances)).
-      Se cambió a `Standard_E4ds_v5` (x86, 4 vCPUs, 32GB RAM) en [deploy.yml](deploy.yml),
-      que sí tiene alternos compatibles, más `driver_node_type_flexibility` /
-      `worker_node_type_flexibility` explícitos (`alternate_node_type_ids:
-      ["Standard_E4ds_v4", "Standard_L4s"]`) para que el cluster efímero reintente
-      automáticamente con esas VMs si `Standard_E4ds_v5` también da stockout, sin depender
-      del toggle "Enable auto flexible node types" del workspace.
+- [x] VM del cluster efímero: `Standard_DS3_v2`, `Standard_D4s_v5` y `Standard_E4ds_v5`
+      dieron stockout en East US 2. Causa raíz real: la suscripción tiene una cuota
+      **regional total** de 4 vCPUs en East US 2 (no por familia de VM) — cada una de esas
+      tres VMs pedía exactamente 4 vCPUs, sin margen, por eso Azure se quedaba colgado en
+      `CREATING` en vez de fallar rápido. Se cambió a `Standard_D2s_v5` (x86, 2 vCPUs, 8GB
+      RAM) en [deploy.yml](deploy.yml), con margen dentro de la cuota — de sobra para
+      `prepamb`/`extract`/`transform`/`load`/`grants` con datasets de este tamaño en Single
+      Node. Se quitaron `driver_node_type_flexibility`/`worker_node_type_flexibility`: no
+      aportan nada contra un límite de cuota total (el fallback también consumiría vCPUs de
+      la misma cuota) y solo complicaban el debug.
 - [ ] Completar los prerequisitos manuales de arriba (credencial de Git, GitHub
       Environments/secrets, `REPO_PATH`) y correr el workflow por primera vez
