@@ -85,24 +85,25 @@ disparó el workflow — así se preserva la estructura de carpetas tal cual est
 
 - [x] `proceso/` completo end-to-end (`prepamb → extract x2 → transform → load → grants`) —
       `deploy.yml` referencia los 6 notebooks reales, DAG validado
-- [x] VM del cluster efímero: `Standard_DS3_v2`, `Standard_D4s_v5` y `Standard_E4ds_v5`
-      dieron stockout en East US 2. Causa raíz real: la suscripción tiene una cuota
-      **regional total** de 4 vCPUs en East US 2 (no por familia de VM) — cada una de esas
-      tres VMs pedía exactamente 4 vCPUs, sin margen, por eso Azure se quedaba colgado en
-      `CREATING` en vez de fallar rápido. Se cambió a `Standard_D2ds_v6` (x86, 2 vCPUs, 8GB
-      RAM, con disco local) en [deploy.yml](deploy.yml), con margen dentro de la cuota — de
-      sobra para `prepamb`/`extract`/`transform`/`load`/`grants` con datasets de este tamaño
-      en Single Node. Se quitaron `driver_node_type_flexibility`/`worker_node_type_flexibility`:
-      no aportan nada contra un límite de cuota total (el fallback también consumiría vCPUs
-      de la misma cuota) y solo complicaban el debug.
+- [x] VM del cluster efímero — historia de diagnóstico (via Databricks CLI, `clusters
+      events`): `Standard_DS3_v2`, `Standard_D4s_v5`, `Standard_E4ds_v5` y `Standard_D2ds_v6`
+      fallaron todos con `CLOUD_PROVIDER_RESOURCE_STOCKOUT` / `SkuNotAvailable` /
+      "Capacity Restrictions" en East US 2 — **no era cuota, era falta de capacidad física
+      de esas SKU x86 en la región** (un error de cuota sería `QuotaExceeded`). Se probó en
+      vivo (crear cluster + `clusters events`) que `Standard_D2ads_v6` (AMD, x86) sí tenía
+      capacidad y llegó a RUNNING. Config final: **`Standard_D4plds_v6`** (ARM/Ampere, 4
+      vCPUs, 8GB) con **DBR `17.3.x-scala2.13`** (LTS, Apache Spark 4.0). Es la config que el
+      dueño ya había corrido con éxito durante un curso en esta misma suscripción.
 
-      > Nota: la generación v5 no tiene ningún node type de 2 vCPUs soportado por Databricks
-      > (el más chico es `Standard_D4s_v5`, 4 vCPUs — agota la cuota). Las únicas VMs de 2
-      > vCPUs en la lista de node types soportados son de generación v6, por eso `D2ds_v6`.
-      > Como las VM v6 son muy nuevas, DBR 14.3 LTS no trae la imagen para bootearlas (el
-      > cluster quedaba en loop "Compute X does not exist / acquiring" sin llegar a RUNNING).
-      > Por eso el `spark_version` se subió a `16.4.x-scala2.12` (LTS), que sí soporta v6.
-      > El pipeline es PySpark DataFrame API + `spark.sql` DDL, sin nada específico de
-      > versión, así que el salto de runtime no afecta el código.
+      > Por qué ARM (`D4plds_v6`): las VM ARM de Azure usan un **pool de capacidad y una
+      > cuota separados** del x86, así que esquivan por completo el stockout x86 que nos tuvo
+      > dando vueltas. El pipeline es 100% PySpark DataFrame API + `spark.sql` DDL +
+      > `databricks-sdk` — sin dependencias nativas x86, corre igual en ARM. `D4plds_v6` es
+      > ARM, por eso requiere un runtime ARM; DBR 17.3 LTS lo es.
+      >
+      > Nota Spark 4.0: DBR 17.3 trae Apache Spark 4.0 con **ANSI mode activado por
+      > defecto** (casts/divisiones inválidas lanzan error en vez de devolver `null`). El
+      > Load ya protege las divisiones con `F.when(... != 0)`, pero es algo a vigilar si
+      > aparece algún error de casteo en Extract/Transform.
 - [ ] Completar los prerequisitos manuales de arriba (credencial de Git, GitHub
       Environments/secrets, `REPO_PATH`) y correr el workflow por primera vez
