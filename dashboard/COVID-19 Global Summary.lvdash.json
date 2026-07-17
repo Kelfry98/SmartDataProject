@@ -1,0 +1,690 @@
+{
+  "datasets": [
+    {
+      "name": "9888c347",
+      "displayName": "covid_summary",
+      "queryLines": [
+        "SELECT * FROM IDENTIFIER(:catalog || '.golden.covid_summary_by_country')"
+      ],
+      "columns": [
+        {
+          "displayName": "year",
+          "expression": "LEFT(`year_month`, 4)"
+        }
+      ],
+      "parameters": [
+        {
+          "displayName": "catalog",
+          "keyword": "catalog",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "dev_catalog"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7f7a31de",
+      "displayName": "kpi_cases",
+      "queryLines": [
+        "SELECT SUM(final_new_cases) as total_cases\r\n",
+        "FROM IDENTIFIER(:catalog || '.golden.covid_summary_by_country')"
+      ],
+      "parameters": [
+        {
+          "displayName": "catalog",
+          "keyword": "catalog",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "dev_catalog"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "320a37f7",
+      "displayName": "kpi_deaths",
+      "queryLines": [
+        "SELECT SUM(final_new_deaths) as total_deaths\r\n",
+        "FROM IDENTIFIER(:catalog || '.golden.covid_summary_by_country')"
+      ],
+      "parameters": [
+        {
+          "displayName": "catalog",
+          "keyword": "catalog",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "dev_catalog"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8b004b27",
+      "displayName": "kpi_cfr",
+      "queryLines": [
+        "SELECT AVG(case_fatality_rate) as avg_cfr\r\n",
+        "FROM IDENTIFIER(:catalog || '.golden.covid_summary_by_country')\r\n",
+        "WHERE case_fatality_rate IS NOT NULL"
+      ],
+      "parameters": [
+        {
+          "displayName": "catalog",
+          "keyword": "catalog",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "dev_catalog"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "top10_cases_per_million",
+      "displayName": "top10_cases_per_million",
+      "queryLines": [
+        "SELECT\n",
+        "  country_norm,\n",
+        "  cases_per_million\n",
+        "FROM\n",
+        "  IDENTIFIER(:catalog || '.golden.covid_summary_by_country')\n",
+        "WHERE\n",
+        "  year_month\n",
+        "    = (\n",
+        "      SELECT\n",
+        "        MAX(year_month)\n",
+        "      FROM\n",
+        "        IDENTIFIER(:catalog || '.golden.covid_summary_by_country')\n",
+        "      WHERE\n",
+        "        cases_per_million IS NOT NULL\n",
+        "        AND cases_per_million > 0\n",
+        "        AND country_norm IS NOT NULL\n",
+        "    )\n",
+        "  AND cases_per_million IS NOT NULL\n",
+        "  AND country_norm IS NOT NULL\n",
+        "ORDER BY\n",
+        "  cases_per_million DESC\n",
+        "LIMIT 10"
+      ],
+      "parameters": [
+        {
+          "displayName": "catalog",
+          "keyword": "catalog",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "dev_catalog"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "c66179f9",
+      "displayName": "map_deaths",
+      "queryLines": [
+        "SELECT INITCAP(LOWER(country_norm)) as country, deaths_per_million\r\n",
+        "FROM IDENTIFIER(:catalog || '.golden.covid_summary_by_country')\r\n",
+        "WHERE year_month = (\r\n",
+        "  SELECT MAX(year_month) \r\n",
+        "  FROM IDENTIFIER(:catalog || '.golden.covid_summary_by_country')\r\n",
+        "  WHERE year_month LIKE '2024%' AND deaths_per_million IS NOT NULL\r\n",
+        ")\r\n",
+        "AND deaths_per_million IS NOT NULL"
+      ],
+      "parameters": [
+        {
+          "displayName": "catalog",
+          "keyword": "catalog",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "dev_catalog"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "top10_deaths_per_million",
+      "displayName": "top10_deaths_per_million",
+      "queryLines": [
+        "SELECT\n",
+        "  INITCAP(LOWER(country_norm)) as country,\n",
+        "  deaths_per_million\n",
+        "FROM\n",
+        "  IDENTIFIER(:catalog || '.golden.covid_summary_by_country')\n",
+        "WHERE\n",
+        "  year_month\n",
+        "    = (\n",
+        "      SELECT\n",
+        "        MAX(year_month)\n",
+        "      FROM\n",
+        "        IDENTIFIER(:catalog || '.golden.covid_summary_by_country')\n",
+        "      WHERE\n",
+        "        year_month LIKE '2024%'\n",
+        "        AND deaths_per_million IS NOT NULL\n",
+        "    )\n",
+        "  AND deaths_per_million IS NOT NULL\n",
+        "ORDER BY\n",
+        "  deaths_per_million DESC\n",
+        "LIMIT 10"
+      ],
+      "parameters": [
+        {
+          "displayName": "catalog",
+          "keyword": "catalog",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "dev_catalog"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "13d881bc",
+      "displayName": "Global Summary",
+      "layout": [
+        {
+          "widget": {
+            "name": "c1e683a1",
+            "multilineTextboxSpec": {
+              "lines": [
+                "<span style=\"text-align:center;display:block;\"><span style=\"font-size: 24px;\">**COVID-19 Global Summary**</span></span>"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "cas",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "7f7a31de",
+                  "fields": [
+                    {
+                      "name": "sum(total_cases)",
+                      "expression": "SUM(`total_cases`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Casos Acumulados"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_cases)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "33caa705",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "320a37f7",
+                  "fields": [
+                    {
+                      "name": "sum(total_deaths)",
+                      "expression": "SUM(`total_deaths`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Total Deaths"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_deaths)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 1,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "d4ed612b",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8b004b27",
+                  "fields": [
+                    {
+                      "name": "sum(avg_cfr)",
+                      "expression": "SUM(`avg_cfr`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Avg Case Fatality Rate"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(avg_cfr)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 1,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "ad6247d5",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "9888c347",
+                  "fields": [
+                    {
+                      "name": "country_norm",
+                      "expression": "`country_norm`"
+                    },
+                    {
+                      "name": "year",
+                      "expression": "`year`"
+                    },
+                    {
+                      "name": "max(final_cumulative_cases)",
+                      "expression": "MAX(`final_cumulative_cases`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`year` <= '2024'"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Cumulative Cases by Year & Country",
+                "showTitle": true
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "year",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "max(final_cumulative_cases)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "country_norm",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 8,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "top10_bar",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "top10_cases_per_million",
+                  "fields": [
+                    {
+                      "name": "cases_per_million",
+                      "expression": "`cases_per_million`"
+                    },
+                    {
+                      "name": "country_norm",
+                      "expression": "`country_norm`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Top 10 Países por Cases per Million (último mes)",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "cases_per_million",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "country_norm",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 4,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "muer",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "c66179f9",
+                  "fields": [
+                    {
+                      "name": "sum(deaths_per_million)",
+                      "expression": "SUM(`deaths_per_million`)"
+                    },
+                    {
+                      "name": "country",
+                      "expression": "`country`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "frame": {
+                "showTitle": true,
+                "title": "Muertes X Paises"
+              },
+              "widgetType": "choropleth-map",
+              "encodings": {
+                "color": {
+                  "fieldName": "sum(deaths_per_million)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "extra": [
+                  {
+                    "fieldName": "country"
+                  },
+                  {
+                    "fieldName": "sum(deaths_per_million)",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "compact",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 2
+                      }
+                    }
+                  }
+                ],
+                "region": {
+                  "regionType": "mapbox-v4-admin",
+                  "admin0": {
+                    "fieldName": "country",
+                    "type": "field",
+                    "geographicRole": "admin0-name-en"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 10,
+            "width": 8,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "08da0989",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "top10_deaths_per_million",
+                  "fields": [
+                    {
+                      "name": "deaths_per_million",
+                      "expression": "`deaths_per_million`"
+                    },
+                    {
+                      "name": "country",
+                      "expression": "`country`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Top 10 Países por Deaths per Million (2024)",
+                "showTitle": true
+              },
+              "mark": {
+                "colors": [
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 5
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 2
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 5
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 6
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 7
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 10
+                  }
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "deaths_per_million",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "country",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 10,
+            "width": 4,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}
