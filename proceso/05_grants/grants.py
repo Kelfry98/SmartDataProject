@@ -14,8 +14,11 @@ environment = dbutils.widgets.get("environment")
 catalog = f"{environment}_catalog"
 
 # En Databricks Repos este notebook vive en proceso/05_grants/, seguridad/ es hermano de
-# proceso/ en la raíz del repo.
-NOTEBOOK_DIR = os.path.dirname(os.path.abspath(__file__))
+# proceso/ en la raíz del repo. __file__ no está definido corriendo interactivo (Run all
+# en el notebook) — solo es confiable en Jobs. Se resuelve vía el contexto del notebook.
+NOTEBOOK_DIR = "/Workspace" + os.path.dirname(
+    dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+)
 SEGURIDAD_DIR = os.path.normpath(os.path.join(NOTEBOOK_DIR, "..", "..", "seguridad"))
 
 

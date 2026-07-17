@@ -23,3 +23,11 @@ Principal y criterio de acceso (`account users`) documentados en
 
 `{catalog}` se resuelve dinámicamente vía el widget `environment`, igual que en el resto
 del pipeline.
+
+## Nota de implementación — resolución de ruta a `seguridad/`
+
+Igual que [proceso/01_prepamb/prepamb.py](../01_prepamb/README.md#notas-de-implementación),
+este notebook resuelve `NOTEBOOK_DIR` vía el contexto del notebook
+(`dbutils.notebook.entry_point...notebookPath()`) en vez de `__file__`, porque `__file__`
+no está definido al correr interactivo ("Run all") en Databricks — solo es confiable
+dentro de un Job.
