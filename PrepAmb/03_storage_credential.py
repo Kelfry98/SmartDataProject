@@ -1,12 +1,5 @@
-# PrepAmb 03 — Storage Credential (Managed Identity), vía Databricks SDK.
-#
-# CREATE STORAGE CREDENTIAL ... WITH AZURE_MANAGED_IDENTITY no es un comando SQL válido
-# en Databricks: los Storage Credentials respaldados por Azure Managed Identity solo se
-# pueden crear vía la UI o el Databricks SDK/CLI (Unity Catalog REST API) — por eso este
-# paso es un script Python, no un .sql como 01/02/04. Validado manualmente en adbk-prod.
-#
-# Se crea una sola vez a nivel de metastore (no es específico de dev/prod); prepamb.py lo
-# invoca en ambos ambientes de forma idempotente (get-or-create).
+# PrepAmb 03 — Storage Credential (Managed Identity) vía Databricks SDK, idempotente (get-or-create).
+# Es Python porque CREATE STORAGE CREDENTIAL ... WITH AZURE_MANAGED_IDENTITY no es SQL válido en Databricks.
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import catalog

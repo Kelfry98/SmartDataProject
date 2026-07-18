@@ -1,12 +1,5 @@
 # Databricks notebook source
-# Load (Golden) — consolida silver.covid_unified en una sola verdad por país+mes, con
-# métricas finales y per-cápita, lista para el dashboard de Lakeview. 100% PySpark
-# DataFrame API, sin Spark SQL.
-#
-# Regla de consolidación: WHO como fuente primaria, historical como respaldo cuando WHO
-# no tenga dato (coalesce(who_*, hist_*)). WHO es la fuente oficial/reguladora (la OMS
-# es quien certifica estos números); historical se usa de respaldo porque cubre un rango
-# histórico más amplio y es la única fuente con `population`.
+# Load (Golden) — consolida silver.covid_unified con métricas finales y per-cápita → golden.covid_summary_by_country.
 
 dbutils.widgets.text("environment", "dev", "Ambiente (dev|prod)")
 environment = dbutils.widgets.get("environment")
@@ -20,8 +13,7 @@ silver_df = spark.table(f"{catalog}.silver.covid_unified")
 
 # COMMAND ----------
 
-# Métricas finales: WHO primero, historical de respaldo (coalesce). Population solo
-# viene de historical — WHO no la reporta.
+# Métricas finales: WHO primero, historical de respaldo (coalesce). Population solo de historical.
 consolidated = silver_df.select(
     "country_norm",
     "year_month",
@@ -35,8 +27,7 @@ consolidated = silver_df.select(
 
 # COMMAND ----------
 
-# Per-cápita: solo donde el denominador no sea nulo/cero (when sin otherwise = NULL en
-# vez de error o Infinity — el "nullif" pedido).
+# Per-cápita: NULL si el denominador es 0/NULL (when sin otherwise, en vez de error o Infinity).
 golden = (
     consolidated
     .withColumn(

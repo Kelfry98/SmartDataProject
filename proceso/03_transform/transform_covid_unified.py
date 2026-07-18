@@ -1,13 +1,5 @@
 # Databricks notebook source
-# Transform (Silver) — unifica who_covid_daily + covid_historical_series en una sola
-# tabla país+mes. 100% PySpark DataFrame API, sin Spark SQL.
-#
-# Por qué se agrega a país+mes y no por fecha exacta: las dos fuentes tienen
-# granularidad distinta (WHO: diaria 2020-2026; historical: mensual antes de 2020,
-# diaria 2020-2024) y usan códigos de país incompatibles (WHO = alpha-2 en
-# Country_code, historical = alpha-3 en iso_code) — cruzar por fecha exacta o por
-# código de país dejaría nulos masivos en el tramo mensual de historical. El cruce
-# real es por NOMBRE de país normalizado + year_month.
+# Transform (Silver) — unifica ambas fuentes Bronze por país normalizado + year_month → silver.covid_unified.
 
 dbutils.widgets.text("environment", "dev", "Ambiente (dev|prod)")
 environment = dbutils.widgets.get("environment")
@@ -22,12 +14,8 @@ hist_df = spark.table(f"{catalog}.bronze.covid_historical_series")
 
 # COMMAND ----------
 
-# Normalización de nombre de país: trim + upper + quitar acentos (translate, sin UDF).
-# El mapeo de casos conocidos de abajo es best-effort — cubre los choques más comunes
-# entre los nombres de país de WHO y de historical, NO es un diccionario ISO completo.
-# Cualquier país fuera de esta lista que no coincida textualmente entre ambas fuentes
-# quedará como dos filas separadas tras el FULL OUTER JOIN (una por fuente) en vez de
-# una sola fila combinada — aceptable para el alcance de este proyecto.
+# Normaliza el nombre de país (trim + upper + sin acentos) + overrides de casos conocidos
+# donde WHO e historical lo nombran distinto (best-effort, no un diccionario ISO completo).
 
 ACCENTS_FROM = "ÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑ"
 ACCENTS_TO = "AAAAAEEEEIIIIOOOOOUUUUCN"
@@ -39,7 +27,7 @@ COUNTRY_NAME_OVERRIDES = {
     "KOREA, REPUBLIC OF": "SOUTH KOREA",
     "VIET NAM": "VIETNAM",
     "CZECHIA": "CZECH REPUBLIC",
-    "COTE D'IVOIRE": "IVORY COAST",  # ya sin acento tras el translate de arriba
+    "COTE D'IVOIRE": "IVORY COAST",
 }
 
 
@@ -52,7 +40,7 @@ def normalize_country(column):
 
 # COMMAND ----------
 
-# WHO: agregado a país_normalizado + year_month
+# WHO: agregado a país + year_month
 who_agg = (
     who_df
     .withColumn("country_norm", normalize_country(F.col("Country")))
@@ -67,8 +55,7 @@ who_agg = (
     .withColumn("_from_who", F.lit(True))
 )
 
-# Historical: agregado a país_normalizado + year_month (population con avg porque es
-# constante por país pero puede repetirse por fila dentro del mismo mes)
+# Historical: agregado a país + year_month (population con avg)
 hist_agg = (
     hist_df
     .withColumn("country_norm", normalize_country(F.col("location")))

@@ -115,10 +115,10 @@ exclusivamente mediante Managed Identity: Storage Credential `raw_sc` + External
       correr el pipeline para confirmar
 - [x] Transform (Silver) — [transform_covid_unified.py](proceso/03_transform/) une ambas
       fuentes Bronze por país+mes en `silver.covid_unified` (cruce por nombre normalizado,
-      ver [proceso/03_transform/README.md](proceso/03_transform/README.md))
+      ver [proceso/03_transform/](proceso/03_transform/))
 - [x] Load (Golden) — [load_covid_summary_by_country.py](proceso/04_load/) consolida
       Silver con `coalesce(who_*, hist_*)` (WHO primero, historical de respaldo) y calcula
-      métricas per-cápita, ver [proceso/04_load/README.md](proceso/04_load/README.md)
+      métricas per-cápita, ver [proceso/04_load/](proceso/04_load/)
 - [x] Grants — [grants.py](proceso/05_grants/) aplica `USE CATALOG`/`USE SCHEMA`/`SELECT`
       a `account users` sobre las 4 tablas finales, leyendo [seguridad/](seguridad/) — ver
       [seguridad/README.md](seguridad/README.md)

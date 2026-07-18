@@ -1,12 +1,5 @@
 # Databricks notebook source
-# Extract (Bronze) — Coronavirus (COVID-19) Worldwide Data (2018-2026), serie histórica
-# https://www.kaggle.com/datasets/zkskhurram/coronavirus-covid-19-worldwide-data2018-2026
-#
-# 100% PySpark DataFrame API, sin Spark SQL. Lee el CSV directo desde la external
-# location de Unity Catalog (PrepAmb/04_external_location.sql: raw_ext_loc), autenticado
-# vía Managed Identity — sin DBFS, sin Volumes, sin access keys. El CSV ya está subido a
-# Azure manualmente (ver datasets/covid-historical-series/README.md). Sin
-# transformaciones: copia el dato crudo tal cual a Bronze.
+# Extract (Bronze) — COVID-19 serie histórica → bronze.covid_historical_series. Lee el CSV de Raw vía Managed Identity, sin transformar.
 
 dbutils.widgets.text("environment", "dev", "Ambiente (dev|prod)")
 dbutils.widgets.text("storage_account", "stdbkprojectsraw", "Storage Account de Raw")
