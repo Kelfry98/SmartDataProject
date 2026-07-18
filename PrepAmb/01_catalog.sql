@@ -1,6 +1,4 @@
--- Catalog de Unity Catalog para el ambiente actual (dev_catalog / prod_catalog).
--- Placeholder {catalog} sustituido por proceso/01_prepamb/prepamb.py según el
--- parámetro `environment` (dev|prod) recibido del job de CI/CD.
+-- Catalog del ambiente (dev_catalog / prod_catalog). {catalog} sustituido por prepamb.py.
 
 CREATE CATALOG IF NOT EXISTS {catalog}
   MANAGED LOCATION 'abfss://raw@stdbkprojectsraw.dfs.core.windows.net/catalog-{catalog}/';

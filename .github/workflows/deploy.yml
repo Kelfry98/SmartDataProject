@@ -47,12 +47,8 @@ jobs:
           # cada workspace (Databricks > Settings > Linked accounts).
           echo "REPO_PATH=/Repos/jlptrader30@hotmail.com/SmartDataProject" >> $GITHUB_ENV
 
-      # No usamos actions/checkout: el código no se copia vía el runner de GitHub, se
-      # sincroniza directo desde GitHub hacia el workspace de Databricks vía la Repos API
-      # (ver step siguiente). Así proceso/01_prepamb/prepamb.py encuentra PrepAmb/*.sql
-      # como carpeta hermana, igual que en un checkout normal — si en cambio copiáramos
-      # notebooks sueltos (como hacía el template original), esa resolución de ruta
-      # relativa se rompería.
+      # El código se sincroniza directo a Databricks vía la Repos API (no actions/checkout),
+      # preservando la estructura para que prepamb.py encuentre PrepAmb/*.sql como hermana.
       - name: Sync Databricks Repo to latest commit
         run: |
           DEST_HOST=${{ secrets.DATABRICKS_HOST }}
@@ -102,11 +98,9 @@ jobs:
           fi
 
       # Cluster efímero (Job Compute), un solo cluster compartido por todas las tareas
-      # (job_cluster_key), Single Node — se levanta al arrancar el job y se apaga solo al
-      # terminar. Así nunca queda un cluster prendido de forma persistente, en ningún
-      # ambiente. Ajustar node_type_id si esa VM no tiene cupo en la suscripción.
+      # (job_cluster_key), Single Node — se levanta al arrancar el job y se apaga al terminar.
       #
-      # DAG actual: prepamb -> {extract_who_covid_daily, extract_covid_historical_series}
+      # DAG: prepamb -> {extract_who_covid_daily, extract_covid_historical_series}
       # -> transform_covid_unified -> load_covid_summary_by_country -> grants.
       - name: Create pipeline job
         run: |

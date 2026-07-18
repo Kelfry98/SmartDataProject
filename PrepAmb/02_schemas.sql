@@ -1,5 +1,4 @@
--- Schemas de la medallion architecture dentro del catalog del ambiente.
--- Placeholder {catalog} sustituido por proceso/01_prepamb/prepamb.py
+-- Schemas de la medallion architecture. {catalog} sustituido por prepamb.py.
 
 CREATE SCHEMA IF NOT EXISTS {catalog}.bronze
 COMMENT 'Capa Bronze — datos extraídos tal cual desde Raw (Extract)';

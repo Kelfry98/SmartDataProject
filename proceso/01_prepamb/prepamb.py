@@ -1,13 +1,6 @@
 # Databricks notebook source
 # DBTITLE 1,Cell 1
-# Prepara el ambiente (dev|prod) en Unity Catalog, corriendo PrepAmb/ en orden:
-# 01_catalog.sql -> 02_schemas.sql -> 03_storage_credential.py -> 04_external_location.sql
-#
-# 03 es Python (Databricks SDK), no SQL: CREATE STORAGE CREDENTIAL ... WITH
-# AZURE_MANAGED_IDENTITY no es un comando SQL válido en Databricks, solo se puede crear
-# vía UI o el SDK/CLI (Unity Catalog REST API). 04 depende de que el storage credential
-# de 03 ya exista. 01/02/04 sí son DDL válido en SQL (única excepción al "100% PySpark"
-# del resto del pipeline: Extract/Transform/Load).
+# Prepara el ambiente (dev|prod) en Unity Catalog: catalog, schemas, storage credential y external location.
 
 import os
 import importlib.util
@@ -24,8 +17,7 @@ access_connector_id = dbutils.widgets.get("access_connector_id")
 
 catalog = f"{environment}_catalog"
 
-# En Databricks Repos este notebook vive en proceso/01_prepamb/, PrepAmb/ es
-# hermano de proceso/ en la raíz del repo.
+# Ruta a PrepAmb/, carpeta hermana de proceso/ en la raíz del repo.
 NOTEBOOK_DIR = "/Workspace" + os.path.dirname(
     dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
 )
@@ -35,9 +27,7 @@ PREPAMB_DIR = os.path.normpath(os.path.join(NOTEBOOK_DIR, "..", "..", "PrepAmb")
 def run_sql_file(filename: str, **params: str) -> None:
     path = os.path.join(PREPAMB_DIR, filename)
     with open(path, "r", encoding="utf-8") as f:
-        # Se filtran las líneas de comentario ANTES de unir y separar por ";" — si no,
-        # un bloque de comentarios pegado (sin ";" de por medio) al primer statement real
-        # hace que todo el bloque se lea como "empieza con --" y ese statement se salte.
+        # Descarta líneas de comentario antes de separar por ";".
         lines = [line for line in f if not line.strip().startswith("--")]
     sql = "".join(lines).format(**params)
     for statement in sql.split(";"):
@@ -67,8 +57,7 @@ run_sql_file("02_schemas.sql", catalog=catalog)
 
 # COMMAND ----------
 
-# 03 — Storage Credential (Managed Identity), vía Databricks SDK — compartido entre
-# ambientes, idempotente (get-or-create dentro del módulo).
+# 03 — Storage Credential (Managed Identity) vía Databricks SDK.
 storage_credential = load_module("03_storage_credential.py")
 storage_credential.create_storage_credential(
     name="raw_sc",
@@ -78,9 +67,7 @@ storage_credential.create_storage_credential(
 
 # COMMAND ----------
 
-# 04 — External Location apuntando al contenedor Raw — compartido entre ambientes.
-# Depende de que raw_sc (paso 03) ya exista. Valores fijos dentro del .sql (ya creada y
-# validada en Azure/Databricks), no toma storage_account/container_name como parámetro.
+# 04 — External Location al contenedor Raw. Depende de que raw_sc (paso 03) exista.
 run_sql_file("04_external_location.sql")
 
 # COMMAND ----------

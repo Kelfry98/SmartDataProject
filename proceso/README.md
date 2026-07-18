@@ -11,8 +11,6 @@ Orden de ejecución del pipeline:
 4. [04_load/](04_load/) — Load: 1 notebook, consolida Silver en `golden.covid_summary_by_country` (métricas finales + per-cápita)
 5. [05_grants/](05_grants/) — aplica los `.sql` de [seguridad/](../seguridad/) sobre catalog/schemas/tablas
 
-Extract usa **un notebook por dataset** (paralelizable, un fallo no bloquea al otro — ver
-[02_extract/README.md](02_extract/README.md)). Transform y Load usan **un solo notebook**
-cada uno para ambos datasets, porque su trabajo es justamente cruzarlos/consolidarlos en
-una tabla unificada — ver [03_transform/README.md](03_transform/README.md) y
-[04_load/README.md](04_load/README.md) para el detalle de cada uno.
+Extract usa un notebook por dataset (paralelizable, un fallo no bloquea al otro). Transform
+y Load usan un solo notebook cada uno, porque su trabajo es cruzar/consolidar ambos datasets
+en una tabla unificada.

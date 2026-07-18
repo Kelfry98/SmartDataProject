@@ -1,10 +1,5 @@
--- External Location de Unity Catalog apuntando al contenedor Raw en Azure Blob Storage
--- (ADLS Gen2), autenticando vía el Storage Credential "raw_sc" creado en
--- 03_storage_credential.py (Managed Identity — sin DBFS, sin Volumes). Debe correr
--- DESPUÉS de 03_storage_credential.py: depende de que raw_sc ya exista.
---
--- Se crea una sola vez a nivel de metastore (no es específico de dev/prod). Ya creada y
--- validada manualmente en Azure/Databricks — valores fijos, sin placeholders.
+-- External Location al contenedor Raw, vía el Storage Credential raw_sc (Managed Identity).
+-- Depende de que raw_sc (03_storage_credential.py) exista. Compartida entre dev y prod.
 
 CREATE EXTERNAL LOCATION IF NOT EXISTS raw_ext_loc
   URL 'abfss://raw@stdbkprojectsraw.dfs.core.windows.net/'

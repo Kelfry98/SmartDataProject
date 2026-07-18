@@ -1,19 +1,18 @@
 # covid-historical-series
 
-Dataset de Kaggle: **Coronavirus (COVID-19) Worldwide Data (2018-2026)**
+Kaggle: **Coronavirus (COVID-19) Worldwide Data (2018-2026)**
 https://www.kaggle.com/datasets/zkskhurram/coronavirus-covid-19-worldwide-data2018-2026
 
 Serie histórica global del COVID-19 (estilo Our World in Data): casos, muertes, tests,
-hospitalización, vacunación y contexto demográfico por país/día.
+hospitalización y contexto demográfico por país/día.
 
-Esta carpeta es solo referencia — el CSV real se descarga manualmente de Kaggle (una sola
-vez) y ya está subido a Azure Blob Storage en:
+Ruta en Raw:
 
 ```
 abfss://raw@stdbkprojectsraw.dfs.core.windows.net/covid-historical-series/covid_historical_time_series.csv
 ```
 
-## Schema real
+## Schema
 
 | Columna | Descripción |
 |---|---|
@@ -37,6 +36,5 @@ abfss://raw@stdbkprojectsraw.dfs.core.windows.net/covid-historical-series/covid_
 | `positive_rate` | Tasa de positividad |
 | `tests_per_case` | Tests por caso confirmado |
 
-El notebook [proceso/02_extract/extract_covid_historical_series.py](../../proceso/02_extract/extract_covid_historical_series.py)
-lee de ahí vía Managed Identity y escribe la tabla Bronze `{catalog}.bronze.covid_historical_series`,
-tal cual, sin transformar.
+Lo lee [proceso/02_extract/extract_covid_historical_series.py](../../proceso/02_extract/extract_covid_historical_series.py)
+→ tabla Bronze `{catalog}.bronze.covid_historical_series`.

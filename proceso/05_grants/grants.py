@@ -1,11 +1,5 @@
 # Databricks notebook source
-# Grants — último paso del pipeline: da permisos sobre lo que se acaba de construir para
-# que otros usuarios/servicios (ej. el dashboard de Lakeview) puedan consultar los datos.
-#
-# Usa spark.sql() para los GRANT, igual que PrepAmb/01_catalog.sql, 02_schemas.sql y
-# 04_external_location.sql: GRANT es DDL de Unity Catalog sin equivalente en el DataFrame
-# API — misma excepción documentada ahí. Lee y aplica los .sql de seguridad/ (fuente de
-# verdad de permisos) en vez de tener los GRANT hardcodeados en este notebook.
+# Grants — último paso del pipeline: aplica los GRANT de seguridad/ sobre catalog, schemas y tablas.
 
 import os
 
@@ -13,9 +7,7 @@ dbutils.widgets.text("environment", "dev", "Ambiente (dev|prod)")
 environment = dbutils.widgets.get("environment")
 catalog = f"{environment}_catalog"
 
-# En Databricks Repos este notebook vive en proceso/05_grants/, seguridad/ es hermano de
-# proceso/ en la raíz del repo. __file__ no está definido corriendo interactivo (Run all
-# en el notebook) — solo es confiable en Jobs. Se resuelve vía el contexto del notebook.
+# Ruta a seguridad/, carpeta hermana de proceso/ en la raíz del repo.
 NOTEBOOK_DIR = "/Workspace" + os.path.dirname(
     dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
 )
@@ -25,9 +17,7 @@ SEGURIDAD_DIR = os.path.normpath(os.path.join(NOTEBOOK_DIR, "..", "..", "segurid
 def run_sql_file(filename: str, **params: str) -> None:
     path = os.path.join(SEGURIDAD_DIR, filename)
     with open(path, "r", encoding="utf-8") as f:
-        # Se filtran las líneas de comentario ANTES de unir y separar por ";" — si no,
-        # un bloque de comentarios pegado (sin ";" de por medio) al primer statement real
-        # hace que todo el bloque se lea como "empieza con --" y ese statement se salte.
+        # Descarta líneas de comentario antes de separar por ";".
         lines = [line for line in f if not line.strip().startswith("--")]
     sql = "".join(lines).format(**params)
     for statement in sql.split(";"):

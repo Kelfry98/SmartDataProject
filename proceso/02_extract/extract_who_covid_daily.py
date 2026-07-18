@@ -1,12 +1,5 @@
 # Databricks notebook source
-# Extract (Bronze) — Worldwide COVID-19 Data from WHO (datos diarios)
-# https://www.kaggle.com/datasets/adilshamim8/worldwide-covid-19-data-from-who
-#
-# 100% PySpark DataFrame API, sin Spark SQL. Lee el CSV directo desde la external
-# location de Unity Catalog (PrepAmb/04_external_location.sql: raw_ext_loc), autenticado
-# vía Managed Identity — sin DBFS, sin Volumes, sin access keys. El CSV ya está subido a
-# Azure manualmente (ver datasets/who-covid-daily/README.md). Sin transformaciones: copia
-# el dato crudo tal cual a Bronze.
+# Extract (Bronze) — WHO COVID-19 daily → bronze.who_covid_daily. Lee el CSV de Raw vía Managed Identity, sin transformar.
 
 dbutils.widgets.text("environment", "dev", "Ambiente (dev|prod)")
 dbutils.widgets.text("storage_account", "stdbkprojectsraw", "Storage Account de Raw")
